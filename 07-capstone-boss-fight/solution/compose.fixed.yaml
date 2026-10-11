@@ -1,0 +1,41 @@
+services:
+  api:
+    image: hero-node:1.0
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # FIX 1: Listen on all interfaces (0.0.0.0)
+      - HOST=0.0.0.0
+      - PORT=4000
+      - DB_HOST=postgres
+      - DB_PASSWORD=fixed_secret_pass
+    networks:
+      # FIX 2: Connect API to both frontend-net and db-net
+      - frontend-net
+      - db-net
+    depends_on:
+      # FIX 3: Wait for service_healthy condition
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      # FIX 4: Explicit password provided
+      - POSTGRES_PASSWORD=fixed_secret_pass
+      - POSTGRES_DB=app_db
+    networks:
+      - db-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+networks:
+  frontend-net:
+  db-net:

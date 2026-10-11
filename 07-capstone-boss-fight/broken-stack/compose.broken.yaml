@@ -1,0 +1,31 @@
+services:
+  api:
+    image: hero-node:1.0
+    restart: "no"
+    ports:
+      - "4000:4000"
+    environment:
+      # BUG 1: Binding to localhost loopback inside container instead of 0.0.0.0
+      - HOST=127.0.0.1
+      - PORT=4000
+      - DB_HOST=postgres
+    networks:
+      # BUG 2: API is only in frontend-net, but postgres is in isolated db-net!
+      - frontend-net
+    depends_on:
+      # BUG 3: Simple depends_on doesn't wait for Postgres to become healthy
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    restart: "no"
+    # BUG 4: Missing POSTGRES_PASSWORD! Causes Postgres container to exit immediately.
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=app_db
+    networks:
+      - db-net
+
+networks:
+  frontend-net:
+  db-net:
