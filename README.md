@@ -202,6 +202,7 @@ Each lab follows the **4-Step Unforgettable Learning Cycle**:
 
 | # | Lab Directory | Focus & Tech Stack | Key Skills Learned |
 |---|---|---|---|
+| **00** | [`00-linux-prerequisites`](./00-linux-prerequisites/README.md) | Linux, Alpine | Essential Linux: File ops (`cp`, `mv`, `rm`), users, switching (`su`), ownership (`chown`), permissions (`chmod`) |
 | **01** | [`01-container-lifecycle`](./01-container-lifecycle/README.md) | Redis, Python, Busybox | Container states, interactive vs detached, `exec`, logs, inspection, dead container rescue |
 | **02** | [`02-dockerfiles-multistage`](./02-dockerfiles-multistage/README.md) | React (Vite), Node/Express, Python | Layer caching, multi-stage builds (800MB ➔ 25MB), non-root security (`USER`), `.dockerignore` |
 | **03** | [`03-storage-and-volumes`](./03-storage-and-volumes/README.md) | PostgreSQL, Node.js hot-reload | Named volumes (persistence proof), bind mounts (macOS dev performance), volume backups |
