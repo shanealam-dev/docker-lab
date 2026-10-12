@@ -5,6 +5,10 @@
 
 ---
 
+> 💡 **Prerequisite**: If you need a refresher on essential Linux file operations (`cp`, `mv`, `rm`), user creation, user switching (`su`), or file permissions (`chown`, `chmod`), check out the dedicated [Lab 00: Linux Prerequisites for Docker](../00-linux-prerequisites/README.md).
+
+---
+
 ## 🧠 1. Visual Mental Model: Container State Machine
 
 A container is simply an **isolated Linux process** packaged with its own filesystem (rootfs).
