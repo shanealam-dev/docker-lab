@@ -46,11 +46,29 @@ rm -f ./rescued_backup.txt
 docker rm -f crash-box > /dev/null
 
 echo ""
-echo "[Step 8] Cleaning up drill containers..."
+echo "[Step 8] Testing Image History & Tagging..."
+docker tag redis:7-alpine my-cache:drill
+echo "Created alias tag 'my-cache:drill'. Image history:"
+docker image history redis:7-alpine --format "table {{.CreatedBy}}\t{{.Size}}" | head -n 4
+
+echo ""
+echo "[Step 9] Simulating Image Removal Conflict Trap..."
+docker create --name locked-test my-cache:drill > /dev/null
+IMG_ID=$(docker inspect --format '{{.Id}}' my-cache:drill)
+if docker rmi "$IMG_ID" 2>&1 | grep -q "conflict"; then
+  echo "🔒 CONFIRMED: Docker safely blocked deleting image because 'locked-test' container exists!"
+fi
+echo "Resolving trap: Deleting container first, then image tag..."
+docker rm locked-test > /dev/null
+docker rmi my-cache:drill > /dev/null
+echo "✅ Image successfully removed after container was deleted!"
+
+echo ""
+echo "[Step 10] Cleaning up drill containers..."
 docker rm -f redis-lab py-web > /dev/null
 
 echo ""
 echo "=========================================="
 echo "✅ DRILL COMPLETED SUCCESSFULLY!"
-echo "You have verified: run -d, --rm, exec, cp, diff, inspect, and rm -f."
+echo "You verified: run -d, --rm, exec, cp, diff, inspect, image history, and rmi conflict resolution."
 echo "=========================================="

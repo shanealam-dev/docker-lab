@@ -107,35 +107,78 @@ A container is simply an **isolated Linux process** packaged with its own filesy
 
 ---
 
-### 🎯 Mission 3: The "Dead Container Rescue" Operation
-*Scenario: A critical service crashed or exited. You need to extract files or logs from the dead container before deleting it!*
+### 🎯 Mission 3: The `docker cp` Mastery & Dead Container Rescue
+*Learn: How to inject files into containers, rescue data from dead containers, and copy recursively without volume mounts.*
 
-1. **Create an ephemeral data container and simulate a write followed by a crash**:
-   ```bash
-   docker run --name crash-box alpine sh -c "echo 'TOP_SECRET_REPORT_$(date)' > /app_report.txt && exit 1"
-   ```
-2. **Check its status**:
-   ```bash
-   docker ps -a --filter "name=crash-box"
-   ```
-   *Notice `STATUS: Exited (1)`.*
+The `docker cp` command works just like `cp` or `scp`.
+> ⚡ **Superpower of `docker cp`**: It works whether the container is **RUNNING**, **PAUSED**, or **EXITED (DEAD)** without requiring SSH or pre-configured volumes!
 
-3. **See what changed in the container's filesystem since it was created**:
-   ```bash
-   docker diff crash-box
-   ```
-   *Notice `A /app_report.txt` (A = Added, C = Changed, D = Deleted).*
+---
 
-4. **Rescue the file from the dead container to your Mac**:
-   ```bash
-   docker cp crash-box:/app_report.txt ./rescued_report.txt
-   cat ./rescued_report.txt
-   ```
-5. **Clean up**:
-   ```bash
-   docker rm crash-box
-   rm -f ./rescued_report.txt
-   ```
+#### 📥 Action A: Copy from Mac Host ➔ INTO Container (Injecting / Hot-patching)
+```bash
+# 1. Start a lightweight Nginx web server
+docker run -d --name copy-demo -p 8085:80 nginx:alpine
+
+# 2. Create a custom HTML file on your Mac
+echo "<h1>Hello from Mac via docker cp!</h1>" > custom_index.html
+
+# 3. Copy the file directly into the running container
+docker cp custom_index.html copy-demo:/usr/share/nginx/html/index.html
+
+# 4. Verify the updated page immediately from your Mac
+curl http://localhost:8085
+```
+*(Notice Nginx serves the updated page immediately without rebuilding the image!)*
+
+---
+
+#### 📤 Action B: Copy from Container ➔ OUT to Mac Host (Dead Container Rescue)
+*Scenario: A critical service crashed or exited. You need to extract files or logs before deleting the container.*
+
+```bash
+# 1. Create a container that writes secret data and crashes (Exit code 1)
+docker run --name crash-box alpine sh -c "echo 'CRITICAL_BACKUP_$(date)' > /app_report.txt && exit 1"
+
+# 2. Verify the container is dead (Status: Exited 1)
+docker ps -a --filter "name=crash-box"
+
+# 3. Inspect the container filesystem changes
+docker diff crash-box
+# (Look for 'A /app_report.txt' — A = Added, C = Changed, D = Deleted)
+
+# 4. Rescue the file from the dead container to your Mac
+docker cp crash-box:/app_report.txt ./rescued_report.txt
+
+# 5. Verify the extracted content on your Mac
+cat ./rescued_report.txt
+```
+
+---
+
+#### 📁 Action C: Copying Entire Directories Recursively
+```bash
+# Create a local test folder with multiple files
+mkdir -p ./my_local_assets && echo "asset1" > ./my_local_assets/a.txt && echo "asset2" > ./my_local_assets/b.txt
+
+# Copy entire local directory INTO container
+docker cp ./my_local_assets copy-demo:/usr/share/nginx/html/assets
+
+# Copy entire directory OUT from container to Mac
+docker cp copy-demo:/etc/nginx ./extracted_nginx_config
+
+# Inspect extracted config on Mac
+ls -la ./extracted_nginx_config
+```
+
+---
+
+#### 🧹 Cleanup Mission 3
+```bash
+docker rm -f copy-demo crash-box
+rm -f custom_index.html rescued_report.txt
+rm -rf my_local_assets extracted_nginx_config
+```
 
 ---
 
@@ -176,6 +219,46 @@ docker start stubborn-box
 time docker kill stubborn-box    # Instant!
 docker rm stubborn-box
 ```
+
+---
+
+### 🎯 Mission 5: Image Inspection, Tagging & The Removal Conflict Trap
+*Learn: How images work under the hood, layer history, and how to fix image deletion errors.*
+
+1. **Inspect image layer history and sizes**:
+   ```bash
+   docker image history redis:7-alpine
+   ```
+   *Notice the exact size added by each step (`WORKDIR`, `RUN`, `ENTRYPOINT`).*
+
+2. **Tag an image (create an alias)**:
+   ```bash
+   docker tag redis:7-alpine my-cache:v1.0
+   docker images | grep my-cache
+   ```
+   *(Notice both tags share the exact same `IMAGE ID` and consume zero extra disk space!)*
+
+3. **Trigger the #1 Image Removal Error**:
+   ```bash
+   # Create a stopped container using this tag
+   docker create --name locked-app my-cache:v1.0
+
+   # Now try to delete the underlying image ID:
+   IMG_ID=$(docker inspect --format '{{.Id}}' my-cache:v1.0)
+   docker rmi $IMG_ID || echo "💥 FAILED: Docker blocked removal because locked-app exists!"
+   ```
+
+4. **The Proper Fix**:
+   Remove the referencing container first, then delete the image:
+   ```bash
+   docker rm locked-app
+   docker rmi my-cache:v1.0
+   ```
+
+5. **Prune dangling `<none>:<none>` images**:
+   ```bash
+   docker image prune -f
+   ```
 
 ---
 
