@@ -106,6 +106,18 @@ In production, your database and cache should **never** share a network with pub
    ```bash
    docker exec public-client ping -c 1 -W 1 private-redis || echo "BLOCKED as expected!"
    ```
+
+   > 🧠 **What do `-c 1` and `-W 1` mean?**
+   > * `-c 1`: **Count**. Send exactly 1 ICMP packet and stop (prevents infinite ping loops).
+   > * `-W 1`: **Timeout**. Wait at most 1 second for a response packet. Without this, an unreachable container can hang for 10–30s waiting for a network reply.
+   > * `|| echo "..."`: If the ping fails (exit code ≠ 0), the shell executes the right-hand command.
+   >
+   > ⚠️ **Pro-Tip: ICMP vs TCP Testing in Docker**:
+   > Pinging tests ICMP, not service availability. Ping can fail because DNS failed to resolve or Alpine lacks `iputils-ping`. In production or microservices, test the actual **TCP port** using netcat or curl:
+   > ```bash
+   > # Test TCP port 6379 directly (timeout in 1s):
+   > docker exec public-client nc -zv -w 1 private-redis 6379 || echo "TCP port 6379 blocked!"
+   > ```
 5. **Start your Node API on `web-tier`, then bridge it to `data-tier`**:
    ```bash
    docker run -d --name api-gateway --network web-tier alpine sleep 1000

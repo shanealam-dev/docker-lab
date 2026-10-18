@@ -132,7 +132,50 @@ docker run --rm \
   -v "$(pwd)":/backup \
   alpine tar czf /backup/pg_backup.tar.gz -C /source_data .
 ```
-You now have `pg_backup.tar.gz` directly on your Mac desktop/folder!
+You now have `pg_backup.tar.gz` directly on your Mac folder!
+
+#### 🧠 Deep Dive: The "One Container with Two Doors" Mental Model
+A common confusion: *Are `/source_data` and `/backup` two separate containers?*  
+**No! They are two directories inside the EXACT SAME temporary container.**
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                      TEMPORARY ALPINE CONTAINER                        │
+│                                                                        │
+│    /source_data (Directory A)              /backup (Directory B)       │
+│         │                                      │                       │
+│         │ (Mount 1: Read-Only)                 │ (Mount 2: Read-Write) │
+└─────────┼──────────────────────────────────────┼───────────────────────┘
+          │                                      │
+          ▼                                      ▼
+   [ Docker Volume ]                      [ macOS Host ]
+    `pg_hero_data`                     Current Folder: $(pwd)
+ (Hidden inside Docker VM)           (Where tar file gets saved)
+```
+
+1. **`-v pg_hero_data:/source_data:ro`**: Mounts the Docker-managed volume into the container at `/source_data`. The `:ro` flag ensures read-only safety so `tar` cannot modify or corrupt live database files.
+2. **`-v "$(pwd)":/backup`**: Bind mounts your current Mac directory to `/backup`.
+3. **`tar czf /backup/pg_backup.tar.gz -C /source_data .`**:
+   - `c` = create archive, `z` = gzip compression, `f` = output file path.
+   - `-C /source_data .` = changes directory into `/source_data` *before* archiving, avoiding storing messy root directory prefixes inside the tarball.
+   - The data is read from `/source_data`, compressed in RAM, and written to `/backup/pg_backup.tar.gz` (which instantly lands on your Mac!).
+4. **`--rm`**: Deletes the temporary Alpine container immediately after the command finishes.
+
+#### 🔄 The Complete Restore Workflow (The Mirror Operation)
+To restore `pg_backup.tar.gz` into a brand new volume (e.g., `pg_hero_data_restored`):
+```bash
+# 1. Create a fresh target volume
+docker volume create pg_hero_data_restored
+
+# 2. Extract the archive into the new volume
+docker run --rm \
+  -v "$(pwd)":/backup:ro \
+  -v pg_hero_data_restored:/target_data \
+  alpine tar xzf /backup/pg_backup.tar.gz -C /target_data
+
+# 3. Verify files were restored
+docker run --rm -v pg_hero_data_restored:/data alpine ls -la /data
+```
 
 ---
 
@@ -156,3 +199,13 @@ docker rm -f pg-server-v2 node-dev 2>/dev/null || true
 docker volume rm pg_hero_data 2>/dev/null || true
 rm -f pg_backup.tar.gz
 ```
+
+#### 🔍 Why `2>/dev/null || true`? (The Idempotent Script Pattern)
+In production scripts and CI/CD, cleanup commands must be **idempotent** (safe to run multiple times without throwing errors or halting scripts).
+
+* **POSIX Standard Streams**:
+  * `0`: `stdin` (keyboard/input)
+  * `1`: `stdout` (normal success output)
+  * `2`: `stderr` (error output)
+* **`2>/dev/null`**: Redirects only stream `2` (`stderr`) to the black hole device (`/dev/null`). If `pg-server-v2` does not exist, Docker's `Error: No such container` is silenced.
+* **`|| true`**: The `||` operator only executes the right side if the left command exits with a non-zero exit code (failure). `true` always exits with code `0`. This guarantees the shell does not abort when running scripts under `set -e` (`errexit`).

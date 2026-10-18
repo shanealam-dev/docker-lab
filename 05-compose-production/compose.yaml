@@ -56,6 +56,8 @@ services:
     image: hero-python:1.0
     container_name: prod-worker
     restart: unless-stopped
+    ports:
+      - "5500:5500"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - REDIS_HOST=redis
@@ -79,7 +81,7 @@ services:
     networks:
       - backend-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 3s
       timeout: 2s
       retries: 5
@@ -100,7 +102,7 @@ services:
     networks:
       - backend-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 3s
       timeout: 2s
       retries: 5
